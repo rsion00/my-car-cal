@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>中古車計算ツール</title>
+    <style>
+        :root { --main-color: #3498db; --bg-color: #f4f7f6; --text-color: #333; --accent-color: #e67e22; --warranty-color: #27ae60; --pack-color: #9b59b6; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-color); padding: 10px; color: var(--text-color); margin: 0; line-height: 1.4; padding-bottom: 100px; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 15px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        h1 { text-align: center; font-size: 1.1rem; color: #2c3e50; margin-top: 5px; }
+        .section { margin-bottom: 12px; border: 1px solid #edf2f7; padding: 12px; border-radius: 10px; }
+        .section-title { font-weight: bold; font-size: 0.85rem; color: var(--main-color); margin-bottom: 10px; border-left: 4px solid var(--main-color); padding-left: 8px; }
+        
+        /* 枠ごとの色分け */
+        .warranty-section { border: 2px solid var(--warranty-color); }
+        .warranty-section .section-title { color: var(--warranty-color); border-left-color: var(--warranty-color); }
+        .pack-section { border: 2px solid var(--pack-color); }
+        .pack-section .section-title { color: var(--pack-color); border-left-color: var(--pack-color); }
+
+        .row { display: flex; align-items: center; margin-bottom: 10px; justify-content: space-between; gap: 10px; }
+        label { font-size: 0.8rem; font-weight: 600; flex: 1; }
+        input[type="number"], select { width: 130px; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; text-align: right; font-size: 0.95rem; -webkit-appearance: none; background-color: white; }
+        input[readonly] { background-color: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
+        
+        .radio-group { display: flex; gap: 4px; flex-wrap: wrap; }
+        .radio-group label { flex: none; }
+        .radio-group input { display: none; }
+        .radio-group span { display: inline-block; padding: 8px 10px; background: #edf2f7; border-radius: 6px; font-size: 0.7rem; cursor: pointer; border: 1px solid #e2e8f0; text-align: center; min-width: 60px; }
+        
+        /* 車両区分選択の色 */
+        .type-group input:checked + span { background: var(--main-color); color: white; border-color: var(--main-color); }
+        /* 保証用ラジオボタンの色 */
+        .warranty-group input:checked + span { background: var(--warranty-color); color: white; border-color: var(--warranty-color); }
+        /* パック用ラジオボタンの色 */
+        .pack-group input:checked + span { background: var(--pack-color); color: white; border-color: var(--pack-color); }
+
+        .tax-display { font-size: 0.75rem; color: #718096; text-align: right; margin-top: -5px; margin-bottom: 5px; }
+        .link-button { display: inline-block; padding: 6px 12px; background-color: var(--accent-color); color: white; text-decoration: none; font-size: 0.7rem; border-radius: 6px; }
+        
+        .total-box { position: fixed; bottom: 0; left: 0; right: 0; background: #2d3748; color: white; padding: 15px; text-align: center; box-shadow: 0 -5px 15px rgba(0,0,0,0.2); z-index: 1000; }
+        .total-label { font-size: 0.8rem; opacity: 0.9; margin-bottom: 2px; }
+        .total-amount { font-size: 1.8rem; font-weight: bold; color: #63b3ed; }
+        .info-text { font-size: 0.65rem; color: #718096; margin-top: 3px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🚗 中古車お見積り計算</h1>
+
+    <!-- 1. 車両区分（クリーニング・パック・利益連動） -->
+    <div class="section" style="background: #ebf8ff;">
+        <div class="section-title">1. 車両タイプ（クリーニング・利益・パック連動）</div>
+        <div class="radio-group type-group">
+            <label><input type="radio" name="carType" value="light" onclick="calculate()" checked> <span>軽自動車</span></label>
+            <label><input type="radio" name="carType" value="compact" onclick="calculate()"> <span>コンパクト(<2.0L)</span></label>
+            <label><input type="radio" name="carType" value="medium" onclick="calculate()"> <span>ミディアム(2.0-2.5L)</span></label>
+        </div>
+    </div>
+
+    <!-- 2. 仕入れ -->
+    <div class="section">
+        <div class="section-title">2. 仕入れ（課税対象）</div>
+        <div class="row"><label>本体落札価格</label><input type="number" id="basePrice" value="0" oninput="calculate()"></div>
+        <div class="row"><label>落札費用</label><input type="number" id="auctionFee" value="0" oninput="calculate()"></div>
+        <div class="row"><label>陸送費用</label><input type="number" id="transportFee" value="0" oninput="calculate()"></div>
+        <div class="tax-display">仕入れ消費税(10%): <span id="taxAmount">0</span> 円</div>
+    </div>
+
+    <!-- 3. 整備・加修 -->
+    <div class="section">
+        <div class="section-title">3. 整備・加修</div>
+        <div class="row"><label>クリーニング費</label><input type="number" id="cleaningFee" value="12000" readonly></div>
+        <div class="row"><label>鈑金費用</label><input type="number" id="repairFee" value="0" oninput="calculate()"></div>
+        <div class="row"><label>車検整備(タイヤ込)</label><input type="number" id="maintenanceFee" value="0" oninput="calculate()"></div>
+    </div>
+
+    <!-- 4. 保証（別会社委託） -->
+    <div class="section warranty-section">
+        <div class="section-title">4. 保証費用（Mプラン：委託先基準）</div>
+        <div class="row">
+            <label>保証用 排気量区分</label>
+            <div class="radio-group warranty-group">
+                <label><input type="radio" name="wType" value="wLight" onclick="calculate()" checked> <span>軽自動車</span></label>
+                <label><input type="radio" name="wType" value="w1800" onclick="calculate()"> <span>〜1.8L</span></label>
+                <label><input type="radio" name="wType" value="wOver" onclick="calculate()"> <span>1.8L〜</span></label>
+            </div>
+        </div>
+        <div class="row">
+            <label>走行距離</label>
+            <select id="mileage" onchange="calculate()">
+                <option value="40000">〜40,000km</option>
+                <option value="60000">〜60,000km</option>
+                <option value="80000">〜80,000km</option>
+                <option value="110000">〜110,000km</option>
+                <option value="150000">〜150,000km</option>
+            </select>
+        </div>
+        <div class="row">
+            <label>保証期間</label>
+            <select id="warrantyTerm" onchange="calculate()">
+                <option value="24">24ヶ月</option><option value="30">30ヶ月</option><option value="36">36ヶ月</option>
+                <option value="42">42ヶ月</option><option value="48">48ヶ月</option><option value="54">54ヶ月</option>
+                <option value="60">60ヶ月</option><option value="66">66ヶ月</option><option value="72">72ヶ月</option>
+            </select>
+        </div>
+        <div class="row"><label>算出保証料</label><input type="number" id="warrantyFee" value="0" readonly></div>
+        <div class="info-text" id="warrantyInfo"></div>
+    </div>
+
+    <!-- 5. 諸費用・税金 -->
+    <div class="section">
+        <div class="section-title">5. 諸費用・税金</div>
+        <div class="row"><label>諸費用(自動車税等)</label><input type="number" id="registrationFee" value="0" oninput="calculate()"></div>
+        <div class="row"><label>環境性能割税</label><input type="number" id="envTax" value="0" oninput="calculate()"></div>
+        <div style="text-align: right; margin-bottom: 5px;"><a href="https://www.jucda.or.jp/tax/kankyouseinouwari/" target="_blank" class="link-button">環境性能割 計算サイト ↗</a></div>
+    </div>
+
+    <!-- 6. おまかせパック -->
+    <div class="section pack-section">
+        <div class="section-title">6. おまかせパック（車種連動）</div>
+        <div class="row">
+            <label>パック期間</label>
+            <div class="radio-group pack-group">
+                <label><input type="radio" name="packYear" value="0" onclick="calculate()" checked> <span>なし</span></label>
+                <label><input type="radio" name="packYear" value="2" onclick="calculate()"> <span>2年</span></label>
+                <label><input type="radio" name="packYear" value="4" onclick="calculate()"> <span>4年</span></label>
+                <label><input type="radio" name="packYear" value="6" onclick="calculate()"> <span>6年</span></label>
+            </div>
+        </div>
+        <div class="row"><label>パック料金内訳</label><input type="number" id="servicePackDisplay" value="0" readonly></div>
+        <div class="info-text" id="packInfo"></div>
+    </div>
+
+    <!-- 7. 利益 -->
+    <div class="section">
+        <div class="section-title">7. 販売利益</div>
+        <div class="row"><label>車両利益</label><input type="number" id="profit" value="150000" oninput="calculate()"></div>
+    </div>
+
+    <!-- 合計（下部固定） -->
+    <div class="total-box">
+        <div class="total-label">お支払総額（乗り出し価格）</div>
+        <div class="total-amount">¥ <span id="totalDisplay">0</span></div>
+    </div>
+</div>
+
+<script>
+    // 保証料データ（税込）
+    const warrantyData = {
+        'wLight': { // 軽自動車
+            '40000': { 24: 49940, 30: 51920, 36: 53900, 42: 57530, 48: 60610, 54: 65560, 60: 69740, 66: 75460, 72: 85030 },
+            '60000': { 24: 55880, 30: 58850, 36: 61820, 42: 67210, 48: 72050, 54: 82830, 60: 95150, 66: 112090, 72: 127600 },
+            '80000': { 24: 64020, 30: 68750, 36: 72930, 42: 85580, 48: 99990, 54: 121220, 60: 139700, 66: 164450, 72: 187000 },
+            '110000': { 24: 75460, 30: 87890, 36: 100210, 42: 122540, 48: 143000, 54: 173580, 60: 199870 }
+        },
+        'w1800': { // 1,800cc以下
+            '40000': { 24: 50050, 30: 51810, 36: 53020, 42: 55660, 48: 58080, 54: 62040, 60: 65340, 66: 68970, 72: 72270 },
+            '60000': { 24: 54780, 30: 57310, 36: 59180, 42: 62810, 48: 66110, 54: 71610, 60: 76670, 66: 86790, 72: 95920 },
+            '80000': { 24: 62150, 30: 65670, 36: 68200, 42: 73370, 48: 80520, 54: 96140, 60: 109560, 66: 123970, 72: 137170 },
+            '110000': { 24: 71830, 30: 77440, 36: 84590, 42: 99220, 48: 112640, 54: 134640, 60: 153340 },
+            '150000': { 24: 91630, 30: 105050, 36: 114950, 42: 134640, 48: 152900, 54: 182710, 60: 208010 }
+        },
+        'wOver': { // 1,801cc以上
+            '40000': { 24: 52690, 30: 56100, 36: 60060, 42: 66770, 48: 72930, 54: 85800, 60: 99440, 66: 115940, 72: 130570 },
+            '60000': { 24: 61490, 30: 67100, 36: 73260, 42: 92180, 48: 111650, 54: 137170, 60: 159170, 66: 185460, 72: 209000 },
+            '80000': { 24: 74030, 30: 89100, 36: 108130, 42: 141020, 48: 171050, 54: 210320, 60: 243650, 66: 268510, 72: 286550 },
+            '110000': { 24: 106040, 30: 130900, 36: 158730, 42: 207020, 48: 251240, 54: 281050, 60: 305690 },
+            '150000': { 24: 150370, 30: 185240, 36: 224950, 42: 273130, 48: 304590, 54: 345290, 60: 380270 }
+        }
+    };
+
+    function calculate() {
+        const carType = document.querySelector('input[name="carType"]:checked').value;
+        const wType = document.querySelector('input[name="wType"]:checked').value;
+        const packYear = parseInt(document.querySelector('input[name="packYear"]:checked').value);
+        const mileage = document.getElementById('mileage').value;
+        const term = document.getElementById('warrantyTerm').value;
+        
+        const cleaningInput = document.getElementById('cleaningFee');
+        const profitInput = document.getElementById('profit');
+        const packDisplay = document.getElementById('servicePackDisplay');
+        const packInfo = document.getElementById('packInfo');
+        const warrantyInput = document.getElementById('warrantyFee');
+        const warrantyInfo = document.getElementById('warrantyInfo');
+
+        // 1. 車両区分連動設定
+        let cleaning = 12000, profit = 150000, packBase = 57900;
+        if (carType === 'compact') { cleaning = 15000; profit = 200000; packBase = 65600; }
+        if (carType === 'medium') { cleaning = 20000; profit = 200000; packBase = 71300; }
+
+        cleaningInput.value = cleaning;
+        // 利益が初期値のままであれば自動セット
+        if (profitInput.value == 150000 || profitInput.value == 200000 || profitInput.value == 0) {
+            profitInput.value = profit;
+        }
+
+        // 2. おまかせパック計算（2年を1倍、4年を2倍、6年を3倍）
+        let packTotal = packYear === 0 ? 0 : packBase * (packYear / 2);
+        packDisplay.value = packTotal;
+        packInfo.innerText = packYear > 0 ? `${carType === 'light' ? '軽' : carType === 'compact' ? 'コンパクト' : 'ミディアム'}：2年単価 ${packBase.toLocaleString()}円の${packYear/2}倍` : "";
+
+        // 3. 保証料計算（委託先区分を使用）
+        let fee = 0;
+        const typeData = warrantyData[wType];
+        if (typeData && typeData[mileage] && typeData[mileage][term]) {
+            fee = typeData[mileage][term];
+            warrantyInfo.innerText = "料金表から算出完了";
+            warrantyInfo.style.color = "#27ae60";
+        } else {
+            fee = 0;
+            warrantyInfo.innerText = "※該当なし（対象外）";
+            warrantyInfo.style.color = "#e74c3c";
+        }
+        warrantyInput.value = fee;
+
+        // 4. 合計計算
+        const getVal = (id) => parseInt(document.getElementById(id).value) || 0;
+        const basePrice = getVal('basePrice');
+        const auctionFee = getVal('auctionFee');
+        const transportFee = getVal('transportFee');
+
+        const taxBase = basePrice + auctionFee + transportFee;
+        const tax = Math.floor(taxBase * 0.1);
+        document.getElementById('taxAmount').innerText = tax.toLocaleString();
+
+        const total = taxBase + tax + cleaning + getVal('repairFee') + getVal('maintenanceFee') + 
+                      getVal('registrationFee') + getVal('envTax') + packTotal + fee + getVal('profit');
+
+        document.getElementById('totalDisplay').innerText = total.toLocaleString();
+    }
+    calculate();
+</script>
+
+</body>
+</html>
